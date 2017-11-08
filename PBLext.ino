@@ -1,13 +1,18 @@
-// #include "DigiKeyboard.h"
+#include <EEPROM.h>
 
 #define IGNORE_AFTER_RELEASE -10
 #define IGNORE_AFTER_PRESS 10
 #define MODES 4
 int modes[] = {20,100,160,255};
 
+#define MODE_ADDR 0
+#define SLEEP_ADDR 1
 
-
+int currentMode = 0;
 void setup() {
+
+  currentMode = EEPROM.read(MODE_ADDR);
+  if(currentMode>=MODES || currentMode<0) currentMode=0;
 
   digitalWrite(0, LOW);
   digitalWrite(2, LOW);
@@ -40,7 +45,7 @@ int buthigh = 0;
 int butsleep = 0;
 int butmode = 0;
 
-int currentMode = 0;
+
 int debounce(int old, int pin){
   if(old<0) return old+1;
   if(old>0 && old<IGNORE_AFTER_PRESS) return old+1;
@@ -77,6 +82,7 @@ if(butmode>0){
   if(mode){
     currentMode++;
     if(currentMode>=MODES) currentMode=0;
+    EEPROM.write(MODE_ADDR, currentMode);
   }
   int pwm = modes[currentMode];
   if(highbeam){

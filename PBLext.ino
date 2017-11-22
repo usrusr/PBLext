@@ -109,11 +109,10 @@ void loop() {
   bdo.update();
 
 
-  
   int lastMode=currentMode;
   if(bup.rose() && bstatup.read())  currentMode++;
   if(bdo.rose() && bstatdo.read())  currentMode--;
-
+ 
   if(currentMode<0) currentMode=0;
   if(currentMode >= MODES) currentMode=MODES-1;
 

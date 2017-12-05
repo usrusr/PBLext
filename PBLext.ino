@@ -20,9 +20,9 @@ int modes[] = {
   255  // saferide 80 high
 };
 
-#define PIN_FLASH 0
+#define PIN_FLASH 3
 #define PIN_BAT_LED 1
-#define PIN_MODE_DOWN 3
+#define PIN_MODE_DOWN 0
 #define PIN_MODE_UP 2
 #define PIN_PWM 4
 #define PIN_BAT_SENSE 5
@@ -58,7 +58,7 @@ Bounce bfl;
 Bounce bup;
 Bounce bdo;
 
-Bounce bstatfl;
+//Bounce bstatfl;
 Bounce bstatup;
 Bounce bstatdo;
 #define STATUS_HOLD_MILLIS 500
@@ -88,8 +88,8 @@ void setup() {
   bdo.interval(5);
   bdo.attach(PIN_MODE_DOWN);
   
-  bstatfl.interval(STATUS_HOLD_MILLIS);
-  bstatfl.attach(PIN_FLASH);
+//  bstatfl.interval(STATUS_HOLD_MILLIS);
+//  bstatfl.attach(PIN_FLASH);
   bstatup.interval(STATUS_HOLD_MILLIS);
   bstatup.attach(PIN_MODE_UP);
   bstatdo.interval(STATUS_HOLD_MILLIS);
@@ -116,11 +116,14 @@ void loop() {
   if(currentMode<0) currentMode=0;
   if(currentMode >= MODES) currentMode=MODES-1;
 
-  bstatfl.update();
+//  bstatfl.update();
   bstatup.update();
   bstatdo.update();
-  if( ! (bstatfl.read() && bstatup.read() && bstatdo.read())){
-    bat.minSchedule(1);
+  if( ! ( bstatup.read() &&
+//          bstatfl.read() &&
+          bstatdo.read() 
+  )){
+    bat.minSchedule(3);
   }
   bat.onLoop();
 

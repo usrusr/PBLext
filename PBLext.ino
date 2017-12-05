@@ -9,14 +9,13 @@
 
 #define IGNORE_AFTER_RELEASE -10
 #define IGNORE_AFTER_PRESS 10
-#define MODES 7
+#define MODES 6
 int modes[] = {
   5,   // enjoy the moonlight mode
   32,  // lowest legally considered "on"
-  60,  // frugal, but not minimalistic
+  64,  // frugal, but not minimalistic
   112, // saferide 80 low
   185, // economy fast cruise
-  245, // slightly below saferide 80 high (leave some headroom for flash signal)
   255  // saferide 80 high
 };
 

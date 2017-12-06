@@ -46,7 +46,7 @@ void message(int count){
 }
 
 // for voltage simulation:
- #define MVOLT_READ 8500
+// #define MVOLT_READ 8100
 #include "batSupport.h"
 
 
@@ -58,8 +58,8 @@ Bounce bup;
 Bounce bdo;
 
 //Bounce bstatfl;
-Bounce bstatup;
-Bounce bstatdo;
+//Bounce bstatup;
+//Bounce bstatdo;
 #define STATUS_HOLD_MILLIS 500
 
 void setup() {
@@ -89,18 +89,25 @@ void setup() {
   
 //  bstatfl.interval(STATUS_HOLD_MILLIS);
 //  bstatfl.attach(PIN_FLASH);
-  bstatup.interval(STATUS_HOLD_MILLIS);
-  bstatup.attach(PIN_MODE_UP);
-  bstatdo.interval(STATUS_HOLD_MILLIS);
-  bstatdo.attach(PIN_MODE_DOWN);
+//  bstatup.interval(STATUS_HOLD_MILLIS);
+//  bstatup.attach(PIN_MODE_UP);
+//  bstatdo.interval(STATUS_HOLD_MILLIS);
+//  bstatdo.attach(PIN_MODE_DOWN);
  
 //  message(1);
 
-  bat.minSchedule(5);
+  //
+
+  
+  if(digitalRead(PIN_FLASH)==LOW){
+    bat.scheduleAbsVoltage(3);
+  }else{
+    bat.minSchedule(5);
+  }
 }
 
 int lastPwm = -1;
-
+int resetMode = currentMode;
 
 void loop() {
   bfl.update();
@@ -109,21 +116,44 @@ void loop() {
 
 
   int lastMode=currentMode;
-  if(bup.rose() && bstatup.read())  currentMode++;
-  if(bdo.rose() && bstatdo.read())  currentMode--;
+  if(bup.fell()){
+    resetMode = currentMode;
+    currentMode++;
+    if( ! bdo.read()){
+      bat.stopAll();
+      bat.scheduleAbsVoltage(3);
+    }else{
+      bat.minSchedule(3);
+    }
+  }
+  if(bdo.fell()){
+    resetMode = currentMode;
+    currentMode--;
+    if( ! bup.read()){
+      bat.stopAll();
+      bat.scheduleAbsVoltage(3);
+    }else{
+      bat.minSchedule(3);
+    }
+  }
  
   if(currentMode<0) currentMode=0;
   if(currentMode >= MODES) currentMode=MODES-1;
 
 //  bstatfl.update();
-  bstatup.update();
-  bstatdo.update();
-  if( ! ( bstatup.read() &&
-//          bstatfl.read() &&
-          bstatdo.read() 
-  )){
-    bat.minSchedule(3);
-  }
+//  bstatup.update();
+//  bstatdo.update();
+//  if( ( ! bstatup.read()) ||
+//      ( ! bstatdo.read())
+//  ){
+//    currentMode = resetMode;
+//  }
+//  if( ( ! bstatup.read()) &&
+//      ( ! bstatdo.read())
+//  ){
+//    bat.scheduleAbsVoltage(3);
+//  }
+
   bat.onLoop();
 
   int bestMode = bat.lowestBlinks(); // minimum 1, should always allow mode 1 because mode 0 is effectively off in terms of regulations
@@ -140,6 +170,7 @@ void loop() {
   int pwm = modes[bestMode];
   if( ! bfl.read()){
     pwm = 255;
+    bat.minSchedule(3);
   }
 
   if(pwm!=lastPwm){

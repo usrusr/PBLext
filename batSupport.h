@@ -22,12 +22,19 @@
 #define MVOLT_READ mVoltRead()
 #endif
 
+#ifndef ABSBASE 
+#define ABSBASE 250
+#endif
+
+#ifndef ABSBREAK 
+#define ABSBREAK 1
+#endif
 
 
 #define VOLTAGES_COUNT 2
 const unsigned int voltages[][2] = {
-  {3200, 4200},
-  {6400, 8400}
+  {3300, 4200},
+  {6600, 8400}
 };
 
 class Bat{
@@ -39,31 +46,96 @@ private:
   int scheduledLoops = 0;
   elapsedMillis curElapsed;
 
-  unsigned int mVoltMin = 0;
-  unsigned int mVoltMax = 0;
-  unsigned int mVoltRange = 0;
+  int mVoltMin = -10; // negative counts battery averaging loops
+  int mVoltMax = 0;
+  int mVoltRange = 0;
   
   boolean looping = false;
-
-  int loopValue;
 
   unsigned int loopMillis;
   unsigned int blinkingMillis;
   unsigned int blinkingPeriod;
   unsigned int blinkingDuty;
   int lowestMode = 999;
+
+  long absoluteVal = 0;
+  long absoluteRemaining = 0;
+  long absoluteStep = 0;
+  long absoluteSubBlinks = 0;
 public: 
   void onLoop(){
     hist[histCur] = MVOLT_READ;
-    if(mVoltMin==0){
+    histCur++;
+    if(histCur>=BAT_HIST_SIZE) histCur=0;
+    if(mVoltMin < 1){
       if(histCur==BAT_HIST_SIZE-1){
-        initVoltages();
-        
+        mVoltMin++;
+        if(mVoltMin==0){
+          initVoltages();
+        }
       }
     }else{
-      
       if(scheduledLoops>0){
-        if( ! looping){
+        if(absoluteVal == -1){
+          absoluteVal = mVoltAvg()/10;
+        }
+        if(absoluteVal>0){
+          if(absoluteRemaining==0 && absoluteStep==0){
+            unsigned long remaining = absoluteVal;
+            absoluteRemaining = absoluteVal;
+            absoluteStep = 1;
+            absoluteSubBlinks = 1;
+            while(true){
+              int lastDigit = remaining % 10;
+              remaining = (remaining - lastDigit) / 10;
+              if(remaining==0){
+                break;
+              }else{
+                absoluteStep = absoluteStep*10;
+                absoluteSubBlinks += 1;
+              }
+            }
+            curElapsed=0;
+            on();
+          }else if(absoluteStep==1 && absoluteRemaining==0){
+              // end loop
+              if(curElapsed>ABSBREAK*10*ABSBASE){
+              scheduledLoops--;
+              absoluteStep=0;
+              curElapsed = 0;
+              if(scheduledLoops==0){
+                absoluteVal=0;
+              }
+            }
+          }else{
+            int blinksOnLevel = absoluteRemaining / absoluteStep;
+            long oneBreak = ABSBREAK*ABSBASE;
+            long onPerBlink = absoluteSubBlinks*ABSBASE;
+            long oneBlinkOnLevel = onPerBlink + oneBreak;
+            if(curElapsed > blinksOnLevel*oneBlinkOnLevel + 4*oneBreak) {
+              // level completed
+              if(absoluteStep==1 || absoluteSubBlinks==1){
+                // prepare end loop
+                absoluteRemaining = 0;
+                absoluteSubBlinks = 0;
+              }else{
+                // decrement level
+                absoluteRemaining = absoluteRemaining % absoluteStep;
+                absoluteSubBlinks--;
+                absoluteStep = absoluteStep/10;
+              }
+              curElapsed = 0;
+            }else if(
+              curElapsed / oneBlinkOnLevel > blinksOnLevel-1  // all blinks for this level done
+              || curElapsed % oneBlinkOnLevel > onPerBlink  // all blinks for this level done
+              || curElapsed%ABSBASE>ABSBASE*0.90  // subblink
+            ){
+              off();
+            }else{
+              on();
+            }
+          }
+        }else if( ! looping){
           curElapsed=0;
           looping=true;
 
@@ -97,14 +169,29 @@ public:
         }
       }
     }
-    histCur++;
-    if(histCur>=BAT_HIST_SIZE) histCur=0;
   }
   void minSchedule(int minSchedule){
     if(scheduledLoops<minSchedule) scheduledLoops = minSchedule;
   }
   int lowestBlinks(){
     return lowestMode;
+  }
+  void scheduleAbsolute(int value, int loops){
+     absoluteVal = value;
+     minSchedule(loops);
+  }
+  void scheduleAbsVoltage(int loops){
+     absoluteVal = -1;
+     minSchedule(loops);
+  }
+  void stopAll(){
+    scheduledLoops=0;
+    looping=false;
+    absoluteVal = 0;
+    absoluteRemaining = 0;
+    absoluteStep = 0;
+    absoluteSubBlinks = 0;
+    off();
   }
 private: 
 

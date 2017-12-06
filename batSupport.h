@@ -206,7 +206,7 @@ private:
   int mVoltRead(){
     unsigned long rawVolt = analogRead(ANALOG_BAT_SENSE);
     unsigned long microvolt = rawVolt * 1000;
-    unsigned int ret = microvolt / 1100;
+    unsigned int ret = microvolt / 1050;
     return ret;
   }
   int currentBlinks(){

@@ -46,7 +46,7 @@ void message(int count){
 }
 
 // for voltage simulation:
-// #define MVOLT_READ 8100
+// #define MVOLT_READ 8000
 #include "batSupport.h"
 
 

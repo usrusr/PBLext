@@ -81,6 +81,7 @@ public:
         }
         if(absoluteVal>0){
           if(absoluteRemaining==0 && absoluteStep==0){
+
             unsigned long remaining = absoluteVal;
             absoluteRemaining = absoluteVal;
             absoluteStep = 1;
@@ -96,7 +97,13 @@ public:
               }
             }
             curElapsed=0;
-            on();
+#ifdef ARDUINO_AVR_DUEMILANOVE
+Serial.write("\nabs init ");
+Serial.write(" absoluteRemaining:");Serial.print(absoluteRemaining);Serial.write(" absoluteSubBlinks ");Serial.print(absoluteSubBlinks);Serial.write(" absoluteStep:");Serial.print(absoluteStep);Serial.write("\n");
+was=1;
+#endif            
+            //off();
+            
           }else if(absoluteStep==1 && absoluteRemaining==0){
               // end loop
               if(curElapsed>ABSBREAK*10*ABSBASE){
@@ -108,11 +115,12 @@ public:
               }
             }
           }else{
-            int blinksOnLevel = absoluteRemaining / absoluteStep;
-            long oneBreak = ABSBREAK*ABSBASE;
-            long onPerBlink = absoluteSubBlinks*ABSBASE;
-            long oneBlinkOnLevel = onPerBlink + oneBreak;
-            if(curElapsed > blinksOnLevel*oneBlinkOnLevel + 4*oneBreak) {
+            unsigned int blinksOnLevel = absoluteRemaining / absoluteStep;
+            unsigned long oneBreak = ABSBREAK*ABSBASE;
+            unsigned long onPerBlink = absoluteSubBlinks*ABSBASE;
+            unsigned long oneBlinkOnLevel = onPerBlink + oneBreak;
+            unsigned long cur = curElapsed;
+            if(cur > blinksOnLevel*oneBlinkOnLevel + 4*oneBreak) {
               // level completed
               if(absoluteStep==1 || absoluteSubBlinks==1){
                 // prepare end loop
@@ -123,15 +131,38 @@ public:
                 absoluteRemaining = absoluteRemaining % absoluteStep;
                 absoluteSubBlinks--;
                 absoluteStep = absoluteStep/10;
+#ifdef ARDUINO_AVR_DUEMILANOVE
+Serial.write("\n next level: absoluteRemaining:");Serial.print(absoluteRemaining);Serial.print(" absoluteSubBlinks:");Serial.print(absoluteSubBlinks);Serial.print(" absoluteStep:");Serial.print(absoluteStep);Serial.print("\n");
+#endif                       
               }
               curElapsed = 0;
             }else if(
-              curElapsed / oneBlinkOnLevel > blinksOnLevel-1  // all blinks for this level done
-              || curElapsed % oneBlinkOnLevel > onPerBlink  // all blinks for this level done
-              || curElapsed%ABSBASE>ABSBASE*0.90  // subblink
+              cur / oneBlinkOnLevel >= blinksOnLevel  // all blinks for this level done
             ){
+#ifdef ARDUINO_AVR_DUEMILANOVE
+if(was!=1) Serial.write(" all blinks for this level done ");
+#endif              
+              off();
+            }else if(
+              cur % oneBlinkOnLevel >= onPerBlink  // blink done
+            ){
+#ifdef ARDUINO_AVR_DUEMILANOVE
+if(was!=1) Serial.write(" blink done ");
+#endif              
+              off();
+            }else if(
+              cur%ABSBASE<ABSBASE/10  // subblink
+            ){
+#ifdef ARDUINO_AVR_DUEMILANOVE
+if(was!=1) Serial.write(" subblink ");
+#endif              
               off();
             }else{
+#ifdef ARDUINO_AVR_DUEMILANOVE
+if(was!=2) {
+  Serial.write(" ...else @");Serial.print(cur);Serial.print("  ");
+}
+#endif               
               on();
             }
           }
@@ -194,12 +225,31 @@ public:
     off();
   }
 private: 
-
+#ifdef ARDUINO_AVR_DUEMILANOVE
+int was=0;
+elapsedMillis swMillis = 0;
+#endif  
   void on(){
+#ifdef ARDUINO_AVR_DUEMILANOVE
+if(was!=2) {
+  Serial.println(swMillis);
+  Serial.write("on ");
+  swMillis=0;
+}
+was=2;
+#endif    
     digitalWrite(PIN_BAT_LED, HIGH);
     return;
   }
   void off(){
+#ifdef ARDUINO_AVR_DUEMILANOVE
+if(was!=1){
+  Serial.println(swMillis);
+  Serial.write("off ");
+  swMillis=0;
+}
+was=1;
+#endif    
     digitalWrite(PIN_BAT_LED, LOW);
     return;
   }

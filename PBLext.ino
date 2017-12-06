@@ -46,7 +46,7 @@ void message(int count){
 }
 
 // for voltage simulation:
-// #define MVOLT_READ 8000
+//#define MVOLT_READ 7819
 #include "batSupport.h"
 
 
@@ -63,7 +63,11 @@ Bounce bdo;
 #define STATUS_HOLD_MILLIS 500
 
 void setup() {
-
+  #ifdef ARDUINO_AVR_DUEMILANOVE
+    Serial.begin(9600);
+    Serial.write("hello");
+    bat.scheduleAbsVoltage(30);
+  #else
   currentMode = EEPROM.read(MODE_ADDR);
   if(currentMode>=MODES || currentMode<0) currentMode=0;
 
@@ -104,6 +108,7 @@ void setup() {
   }else{
     bat.minSchedule(5);
   }
+  #endif
 }
 
 int lastPwm = -1;

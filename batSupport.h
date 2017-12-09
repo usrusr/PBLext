@@ -30,6 +30,9 @@
 #define ABSBREAK 1
 #endif
 
+#ifndef BATINITLOOPS
+#define BATINITLOOPS 50
+#endif
 
 #define VOLTAGES_COUNT 2
 const unsigned int voltages[][2] = {
@@ -45,11 +48,11 @@ private:
 
   int scheduledLoops = 0;
   elapsedMillis curElapsed;
-
-  int mVoltMin = -10; // negative counts battery averaging loops
+public:
+  int mVoltMin = -BATINITLOOPS; // negative counts battery averaging loops
   int mVoltMax = 0;
   int mVoltRange = 0;
-  
+private:  
   boolean looping = false;
 
   unsigned int loopMillis;
@@ -68,6 +71,11 @@ public:
     histCur++;
     if(histCur>=BAT_HIST_SIZE) histCur=0;
     if(mVoltMin < 1){
+      if(histCur==0){
+        off();
+      }else if(histCur>(BATINITLOOPS+mVoltMin)/(BATINITLOOPS/BAT_HIST_SIZE)){
+        on();
+      }
       if(histCur==BAT_HIST_SIZE-1){
         mVoltMin++;
         if(mVoltMin==0){
@@ -254,37 +262,53 @@ was=1;
     return;
   }
   int mVoltRead(){
-    unsigned long rawVolt = analogRead(ANALOG_BAT_SENSE);
-    unsigned long microvolt = rawVolt * 1000;
-    unsigned int ret = microvolt / 1050;
+    unsigned long rawVolt = analogRead(ANALOG_BAT_SENSE)*1000;  // 1023000=2*5v : roughly 0.1 µV
+    unsigned int ret = rawVolt / 105;
     return ret;
   }
   int currentBlinks(){
+    
     long mv = mVoltAvg();
     int blinks = (int)(((long)(mv-mVoltMin)*BAT_ANIM_STEPS)/mVoltRange);
     if(blinks<1) blinks = 1;
     if(blinks>BAT_ANIM_STEPS) blinks = BAT_ANIM_STEPS;
+
+#ifdef ARDUINO_AVR_DUEMILANOVE
+  Serial.print("cuurentBlinks ");Serial.print(blinks);Serial.print("\n");
+#endif    
     return blinks;
   }
   void initVoltages(){
     int mv = mVoltAvg();
 
-
-    
+    scheduleAbsVoltage(2);
+#ifdef ARDUINO_AVR_DUEMILANOVE
+  Serial.print("initVoltages mv");Serial.print(mv);Serial.print("\n");
+#endif     
     int bestdiff = -1;
     for(int i=0;i<VOLTAGES_COUNT;i++) {
       unsigned int lower = voltages[i][0];
       unsigned int higher = voltages[i][1];
-      int curmid = (lower+higher)/2;
-      int curdiff = abs(curmid-mv);
-      
+      //unsigned int curmid2 = (lower+higher)/2;
+      unsigned int curmid = (lower/2+higher/2);
+      unsigned int curdiff = abs(curmid-mv);
+#ifdef ARDUINO_AVR_DUEMILANOVE
+  Serial.print("initVoltages lower ");Serial.print(lower);Serial.print(" higher ");Serial.print(higher);Serial.print(" curmid ");Serial.print(curmid);Serial.print(" curmid2 ");Serial.print(curmid2);Serial.print(" curdiff ");Serial.print(curdiff);Serial.print("\n");
+#endif           
       if(bestdiff<0 || curdiff < bestdiff){
         mVoltMin = lower;
         mVoltMax = higher;
         bestdiff=curdiff;
       }
+#ifdef ARDUINO_AVR_DUEMILANOVE
+  Serial.print("initVoltages bestdiff ");Serial.print(bestdiff);Serial.print("\n");
+#endif    
     }
     mVoltRange = mVoltMax-mVoltMin;
+#ifdef ARDUINO_AVR_DUEMILANOVE
+  Serial.print("initVoltages mVoltRange ");Serial.print(mVoltRange);Serial.print("\n");
+#endif    
+
   }
   int mVoltAvg(){
     unsigned long acc = 0;

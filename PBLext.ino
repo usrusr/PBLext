@@ -46,7 +46,10 @@ void message(int count){
 }
 
 // for voltage simulation:
-//#define MVOLT_READ 7819
+#ifdef ARDUINO_AVR_DUEMILANOVE
+#define MVOLT_READ 8000
+#endif
+//#define MVOLT_READ 7990
 #include "batSupport.h"
 
 
@@ -66,8 +69,8 @@ void setup() {
   #ifdef ARDUINO_AVR_DUEMILANOVE
     Serial.begin(9600);
     Serial.write("hello");
-    bat.scheduleAbsVoltage(30);
-  #else
+    //bat.scheduleAbsVoltage(30);
+  #endif
   currentMode = EEPROM.read(MODE_ADDR);
   if(currentMode>=MODES || currentMode<0) currentMode=0;
 
@@ -103,12 +106,11 @@ void setup() {
   //
 
   
-  if(digitalRead(PIN_FLASH)==LOW){
-    bat.scheduleAbsVoltage(3);
-  }else{
-    bat.minSchedule(5);
-  }
-  #endif
+//  if(digitalRead(PIN_FLASH)==LOW){
+//    bat.scheduleAbsVoltage(3);
+//  }else{
+//    bat.minSchedule(5);
+//  }
 }
 
 int lastPwm = -1;
@@ -128,7 +130,8 @@ void loop() {
       bat.stopAll();
       bat.scheduleAbsVoltage(3);
     }else{
-      bat.minSchedule(3);
+      bat.minSchedule(4);
+//      bat.scheduleAbsolute(bat.mVoltMax/10, 2);
     }
   }
   if(bdo.fell()){
@@ -138,7 +141,8 @@ void loop() {
       bat.stopAll();
       bat.scheduleAbsVoltage(3);
     }else{
-      bat.minSchedule(3);
+      bat.minSchedule(4);
+//      bat.scheduleAbsolute(bat.mVoltMin/10, 2);
     }
   }
  
@@ -175,7 +179,7 @@ void loop() {
   int pwm = modes[bestMode];
   if( ! bfl.read()){
     pwm = 255;
-    bat.minSchedule(3);
+    bat.minSchedule(4);
   }
 
   if(pwm!=lastPwm){

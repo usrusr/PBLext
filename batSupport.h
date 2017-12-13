@@ -1,5 +1,9 @@
 #ifndef BAT_HIST_SIZE
-#define BAT_HIST_SIZE 10
+#ifdef DEBUG_PIN
+#define BAT_HIST_SIZE 25
+#else
+#define BAT_HIST_SIZE 50
+#endif
 #endif
 
 #ifndef BAT_ANIM_DURATION
@@ -34,9 +38,11 @@
 #define BATINITLOOPS 50
 #endif
 
-#define VOLTAGES_COUNT 2
+#define ABS_COPY_MV_ONCE -1
+#define ABS_COPY_MV_REPEATED -2
+#define VOLTAGES_COUNT 1
 const unsigned int voltages[][2] = {
-  {3300, 4200},
+//  {3300, 4200},
   {6600, 8400}
 };
 
@@ -44,7 +50,6 @@ class Bat{
 private:
   int hist[BAT_HIST_SIZE];
   int histCur = 0;
-  int led;
 
   int scheduledLoops = 0;
   elapsedMillis curElapsed;
@@ -59,12 +64,11 @@ private:
   unsigned int blinkingMillis;
   unsigned int blinkingPeriod;
   unsigned int blinkingDuty;
-  int lowestMode = 999;
 
-  long absoluteVal = 0;
-  long absoluteRemaining = 0;
-  long absoluteStep = 0;
-  long absoluteSubBlinks = 0;
+  unsigned int absoluteVal = 0;
+  unsigned int absoluteRemaining = 0;
+  unsigned int absoluteStep = 0;
+  unsigned int absoluteSubBlinks = 0;
 public: 
   void onLoop(){
     hist[histCur] = MVOLT_READ;
@@ -84,14 +88,16 @@ public:
       }
     }else{
       if(scheduledLoops>0){
-        if(absoluteVal == -1){
-          absoluteVal = mVoltAvg()/10;
+        long absoluteValCopy = absoluteVal;
+        if(absoluteVal == ABS_COPY_MV_ONCE || absoluteVal == ABS_COPY_MV_REPEATED){
+          absoluteValCopy = mVoltAvg()/10;
+          if(absoluteVal == ABS_COPY_MV_ONCE) absoluteVal = absoluteValCopy;
         }
-        if(absoluteVal>0){
+        if(absoluteValCopy>0){
           if(absoluteRemaining==0 && absoluteStep==0){
 
-            unsigned long remaining = absoluteVal;
-            absoluteRemaining = absoluteVal;
+            unsigned long remaining = absoluteValCopy;
+            absoluteRemaining = absoluteValCopy;
             absoluteStep = 1;
             absoluteSubBlinks = 1;
             while(true){
@@ -104,18 +110,18 @@ public:
                 absoluteSubBlinks += 1;
               }
             }
-            curElapsed=0;
-#ifdef ARDUINO_AVR_DUEMILANOVE
-Serial.write("\nabs init ");
-Serial.write(" absoluteRemaining:");Serial.print(absoluteRemaining);Serial.write(" absoluteSubBlinks ");Serial.print(absoluteSubBlinks);Serial.write(" absoluteStep:");Serial.print(absoluteStep);Serial.write("\n");
-was=1;
-#endif            
+                                                                                    curElapsed=0;
+                                                                        #ifdef ARDUINO_AVR_DUEMILANOVE
+                                                                        Serial.write("\nabs init ");
+                                                                        Serial.write(" absoluteRemaining:");Serial.print(absoluteRemaining);Serial.write(" absoluteSubBlinks ");Serial.print(absoluteSubBlinks);Serial.write(" absoluteStep:");Serial.print(absoluteStep);Serial.write("\n");
+                                                                        was=1;
+                                                                        #endif            
             //off();
             
           }else if(absoluteStep==1 && absoluteRemaining==0){
               // end loop
               if(curElapsed>ABSBREAK*10*ABSBASE){
-              scheduledLoops--;
+              if(absoluteVal != ABS_COPY_MV_REPEATED) scheduledLoops--;
               absoluteStep=0;
               curElapsed = 0;
               if(scheduledLoops==0){
@@ -124,10 +130,10 @@ was=1;
             }
           }else{
             unsigned int blinksOnLevel = absoluteRemaining / absoluteStep;
-            unsigned long oneBreak = ABSBREAK*ABSBASE;
-            unsigned long onPerBlink = absoluteSubBlinks*ABSBASE;
-            unsigned long oneBlinkOnLevel = onPerBlink + oneBreak;
-            unsigned long cur = curElapsed;
+            unsigned int oneBreak = ABSBREAK*ABSBASE;
+            unsigned int onPerBlink = absoluteSubBlinks*ABSBASE;
+            unsigned int oneBlinkOnLevel = onPerBlink + oneBreak;
+            unsigned int cur = curElapsed;
             if(cur > blinksOnLevel*oneBlinkOnLevel + 4*oneBreak) {
               // level completed
               if(absoluteStep==1 || absoluteSubBlinks==1){
@@ -139,38 +145,38 @@ was=1;
                 absoluteRemaining = absoluteRemaining % absoluteStep;
                 absoluteSubBlinks--;
                 absoluteStep = absoluteStep/10;
-#ifdef ARDUINO_AVR_DUEMILANOVE
-Serial.write("\n next level: absoluteRemaining:");Serial.print(absoluteRemaining);Serial.print(" absoluteSubBlinks:");Serial.print(absoluteSubBlinks);Serial.print(" absoluteStep:");Serial.print(absoluteStep);Serial.print("\n");
-#endif                       
+                                                                #ifdef ARDUINO_AVR_DUEMILANOVE
+                                                                Serial.write("\n next level: absoluteRemaining:");Serial.print(absoluteRemaining);Serial.print(" absoluteSubBlinks:");Serial.print(absoluteSubBlinks);Serial.print(" absoluteStep:");Serial.print(absoluteStep);Serial.print("\n");
+                                                                #endif                       
               }
               curElapsed = 0;
             }else if(
               cur / oneBlinkOnLevel >= blinksOnLevel  // all blinks for this level done
             ){
-#ifdef ARDUINO_AVR_DUEMILANOVE
-if(was!=1) Serial.write(" all blinks for this level done ");
-#endif              
+                                                                #ifdef ARDUINO_AVR_DUEMILANOVE
+                                                                if(was!=1) Serial.write(" all blinks for this level done ");
+                                                                #endif              
               off();
             }else if(
               cur % oneBlinkOnLevel >= onPerBlink  // blink done
             ){
-#ifdef ARDUINO_AVR_DUEMILANOVE
-if(was!=1) Serial.write(" blink done ");
-#endif              
+                                                              #ifdef ARDUINO_AVR_DUEMILANOVE
+                                                              if(was!=1) Serial.write(" blink done ");
+                                                              #endif              
               off();
             }else if(
               cur%ABSBASE<ABSBASE/10  // subblink
             ){
-#ifdef ARDUINO_AVR_DUEMILANOVE
-if(was!=1) Serial.write(" subblink ");
-#endif              
+                                                            #ifdef ARDUINO_AVR_DUEMILANOVE
+                                                            if(was!=1) Serial.write(" subblink ");
+                                                            #endif              
               off();
             }else{
-#ifdef ARDUINO_AVR_DUEMILANOVE
-if(was!=2) {
-  Serial.write(" ...else @");Serial.print(cur);Serial.print("  ");
-}
-#endif               
+                                                            #ifdef ARDUINO_AVR_DUEMILANOVE
+                                                            if(was!=2) {
+                                                              Serial.write(" ...else @");Serial.print(cur);Serial.print("  ");
+                                                            }
+                                                            #endif               
               on();
             }
           }
@@ -203,7 +209,6 @@ if(was!=2) {
       }else{
         int blinks = currentBlinks();
         if(blinks <= 2) {
-          if(blinks<lowestMode) lowestMode=blinks;
           minSchedule(1);
         }
       }
@@ -212,16 +217,14 @@ if(was!=2) {
   void minSchedule(int minSchedule){
     if(scheduledLoops<minSchedule) scheduledLoops = minSchedule;
   }
-  int lowestBlinks(){
-    return lowestMode;
-  }
-  void scheduleAbsolute(int value, int loops){
-     absoluteVal = value;
-     minSchedule(loops);
-  }
+
   void scheduleAbsVoltage(int loops){
-     absoluteVal = -1;
+     absoluteVal = ABS_COPY_MV_ONCE;
      minSchedule(loops);
+  }
+  void scheduleAbsVoltage(){
+     absoluteVal = ABS_COPY_MV_REPEATED;
+     minSchedule(1);
   }
   void stopAll(){
     scheduledLoops=0;
@@ -232,56 +235,54 @@ if(was!=2) {
     absoluteSubBlinks = 0;
     off();
   }
+  int currentBlinks(){
+    
+    unsigned int mv = mVoltAvg();
+    int blinks = ((mv-mVoltMin)*BAT_ANIM_STEPS)/mVoltRange;
+    if(blinks<1) blinks = 1;
+    if(blinks>BAT_ANIM_STEPS) blinks = BAT_ANIM_STEPS;
+
+                                                #ifdef ARDUINO_AVR_DUEMILANOVE
+                                                  Serial.print("cuurentBlinks ");Serial.print(blinks);Serial.print("\n");
+                                                #endif    
+    return blinks;
+  }
 private: 
-#ifdef ARDUINO_AVR_DUEMILANOVE
-int was=0;
-elapsedMillis swMillis = 0;
-#endif  
+                                    #ifdef ARDUINO_AVR_DUEMILANOVE
+                                      int was=0;
+                                      elapsedMillis swMillis = 0;
+                                    #endif  
   void on(){
-#ifdef ARDUINO_AVR_DUEMILANOVE
-if(was!=2) {
-  Serial.println(swMillis);
-  Serial.write("on ");
-  swMillis=0;
-}
-was=2;
-#endif    
+                                    #ifdef ARDUINO_AVR_DUEMILANOVE
+                                      if(was!=2) {
+                                        Serial.println(swMillis);
+                                        Serial.write("on ");
+                                        swMillis=0;
+                                      }
+                                      was=2;
+                                    #endif    
     digitalWrite(PIN_BAT_LED, HIGH);
     return;
   }
   void off(){
-#ifdef ARDUINO_AVR_DUEMILANOVE
-if(was!=1){
-  Serial.println(swMillis);
-  Serial.write("off ");
-  swMillis=0;
-}
-was=1;
-#endif    
+                                  #ifdef ARDUINO_AVR_DUEMILANOVE
+                                  if(was!=1){
+                                    Serial.println(swMillis);
+                                    Serial.write("off ");
+                                    swMillis=0;
+                                  }
+                                  was=1;
+                                  #endif    
     digitalWrite(PIN_BAT_LED, LOW);
     return;
   }
-  int mVoltRead(){
-    unsigned long rawVolt = analogRead(ANALOG_BAT_SENSE)*1000;  // 1023000=2*5v : roughly 0.1 µV
-    unsigned int ret = rawVolt / 105;
-    return ret;
-  }
-  int currentBlinks(){
-    
-    long mv = mVoltAvg();
-    int blinks = (int)(((long)(mv-mVoltMin)*BAT_ANIM_STEPS)/mVoltRange);
-    if(blinks<1) blinks = 1;
-    if(blinks>BAT_ANIM_STEPS) blinks = BAT_ANIM_STEPS;
 
-#ifdef ARDUINO_AVR_DUEMILANOVE
-  Serial.print("cuurentBlinks ");Serial.print(blinks);Serial.print("\n");
-#endif    
-    return blinks;
-  }
   void initVoltages(){
     int mv = mVoltAvg();
 
-    scheduleAbsVoltage(2);
+   if(absoluteVal != ABS_COPY_MV_REPEATED) {
+     scheduleAbsVoltage(2);
+   }
 #ifdef ARDUINO_AVR_DUEMILANOVE
   Serial.print("initVoltages mv");Serial.print(mv);Serial.print("\n");
 #endif     
@@ -310,11 +311,41 @@ was=1;
 #endif    
 
   }
-  int mVoltAvg(){
+  unsigned int mVoltAvg(){
     unsigned long acc = 0;
     for(int i=0;i<BAT_HIST_SIZE;i++) acc+=hist[i];
 
-    return (unsigned int)(acc/BAT_HIST_SIZE);
+    unsigned long avg = (acc/BAT_HIST_SIZE);
+    unsigned long xraw = avg * (unsigned long)9888;
+    unsigned int ret = (unsigned int)(xraw/1000);
+#ifdef PIN_DEBUG    
+    debug.print("avg:");debug.print(avg);debug.print(" ret:");debug.println(ret);
+#endif    
+    return ret;
+
+
+
+//#ifdef PIN_DEBUG    
+//    debug.print("r:");debug.print(raw);debug.print(" ret:");debug.println(ret);
+//#endif    
+//
+//    return (unsigned int)(acc/BAT_HIST_SIZE);
   }  
+  int mVoltRead(){ // return raw, convert after avg
+    return analogRead(ANALOG_BAT_SENSE);
+  }
+  
+//  int mVoltRead(){
+//    unsigned int raw = analogRead(ANALOG_BAT_SENSE);
+////    unsigned int ret = (raw * 9.871);
+////    unsigned long xraw = (unsigned long)raw * (unsigned long)9871;
+//    unsigned long xraw = (unsigned long)raw * (unsigned long)9888;
+//    unsigned int ret = (unsigned int)(xraw/1000);
+////#ifdef PIN_DEBUG    
+////    debug.print("r:");debug.print(raw);debug.print(" ret:");debug.println(ret);
+////#endif    
+//    return ret;
+//  }
+
 };
 

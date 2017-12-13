@@ -1,7 +1,10 @@
 #include <elapsedMillis.h>
-#include <EEPROM.h>
+
 #include <avr/sleep.h>
 #include <avr/interrupt.h>
+
+
+
 
 #define BOUNCE_LOCK_OUT
 #include <Bounce2.h>
@@ -19,7 +22,14 @@ int modes[] = {
   255  // saferide 80 high
 };
 
+//#define PIN_DEBUG 3
+
+#ifdef PIN_DEBUG
+#else
+#include <EEPROM.h>
 #define PIN_FLASH 3
+#endif
+
 #define PIN_BAT_LED 1
 #define PIN_MODE_DOWN 0
 #define PIN_MODE_UP 2
@@ -27,23 +37,21 @@ int modes[] = {
 #define PIN_BAT_SENSE 5
 #define ANALOG_BAT_SENSE 0
 
+//#define PIN_BAT_SENSE 2
+//#define ANALOG_BAT_SENSE 1
+//#define PIN_MODE_UP 5
+
 #define MODE_ADDR 0
-#define SLEEP_ADDR 1
+#define ABS_BATT_ADDR 1
 
+#ifdef PIN_DEBUG
+//  #include <TinyPinChange.h>
+  #include <SoftSerial.h>
 
-void message(int count, int none){
-    for (int i = 0; i <= count; i++) {
-    digitalWrite(PIN_PWM, HIGH);
-    //digitalWrite(0, HIGH);
-    delay(30);
-    digitalWrite(PIN_PWM, LOW);
-    delay(50);
-  }
-  delay(none*80);
-}
-void message(int count){
-  message(count, 1);  
-}
+  SoftSerial debug(PIN_DEBUG, PIN_DEBUG, false); 
+
+#endif
+
 
 // for voltage simulation:
 #ifdef ARDUINO_AVR_DUEMILANOVE
@@ -56,7 +64,14 @@ void message(int count){
 Bat bat;
 int currentMode = 0;
 
+int lastPwm = -1;
+
+int absBatActive = 0;
+
+
+#ifdef PIN_FLASH
 Bounce bfl;
+#endif
 Bounce bup;
 Bounce bdo;
 
@@ -71,117 +86,122 @@ void setup() {
     Serial.write("hello");
     //bat.scheduleAbsVoltage(30);
   #endif
-  currentMode = EEPROM.read(MODE_ADDR);
-  if(currentMode>=MODES || currentMode<0) currentMode=0;
+  #ifdef EEPROM_h
+    currentMode = EEPROM.read(MODE_ADDR);
+    if(currentMode>=MODES || currentMode<0) currentMode=0;
+  #endif
 
+#ifdef PIN_FLASH
   digitalWrite(PIN_FLASH, HIGH); // use internal pullup
+  pinMode(PIN_FLASH, INPUT); // lichthupe (invertiert)  
+  bfl.attach(PIN_FLASH);  
+#endif  
   digitalWrite(PIN_MODE_UP, HIGH);
   digitalWrite(PIN_MODE_DOWN, HIGH);
   digitalWrite(PIN_PWM, HIGH);
-  digitalWrite(PIN_BAT_SENSE, LOW);
+//  digitalWrite(PIN_BAT_SENSE, LOW);
 
-  pinMode(PIN_FLASH, INPUT); // lichthupe (invertiert)
+
   pinMode(PIN_BAT_LED, OUTPUT); // battery LED
   pinMode(PIN_MODE_UP, INPUT);  // sleep
   pinMode(PIN_MODE_DOWN, INPUT);  // mode
   pinMode(PIN_PWM, OUTPUT); // PWM
   pinMode(PIN_BAT_SENSE, INPUT); // battery sense
 
+#ifdef PIN_FLASH
   bfl.interval(5);
-  bfl.attach(PIN_FLASH);
+#endif
   bup.interval(5);
   bup.attach(PIN_MODE_UP);
   bdo.interval(5);
   bdo.attach(PIN_MODE_DOWN);
-  
-//  bstatfl.interval(STATUS_HOLD_MILLIS);
-//  bstatfl.attach(PIN_FLASH);
-//  bstatup.interval(STATUS_HOLD_MILLIS);
-//  bstatup.attach(PIN_MODE_UP);
-//  bstatdo.interval(STATUS_HOLD_MILLIS);
-//  bstatdo.attach(PIN_MODE_DOWN);
- 
-//  message(1);
-
-  //
-
   
 //  if(digitalRead(PIN_FLASH)==LOW){
 //    bat.scheduleAbsVoltage(3);
 //  }else{
 //    bat.minSchedule(5);
 //  }
+  #ifdef EEPROM_h
+  if(EEPROM.read(ABS_BATT_ADDR)){
+    bat.scheduleAbsVoltage();
+    absBatActive=1;
+  }
+  #endif
+#ifdef PIN_DEBUG
+  debug.begin(9600); //After MyDbgSerial.begin(), the serial port is in rxMode by default
+  debug.txMode(); //Before sending a message, switch to txMode
+  debug.println(F("digispark says hello"));
+#endif
 }
 
-int lastPwm = -1;
-int resetMode = currentMode;
 
+void toggleAbsBat(){
+  if(absBatActive){
+    bat.stopAll();
+    absBatActive=0;
+  }else{
+    bat.stopAll();
+    bat.scheduleAbsVoltage();
+    absBatActive=1;
+  }
+  #ifdef EEPROM_h
+  EEPROM.write(ABS_BATT_ADDR, absBatActive);
+  #endif
+}
 void loop() {
+#ifdef PIN_FLASH  
   bfl.update();
+#endif  
   bup.update();
   bdo.update();
 
 
   int lastMode=currentMode;
   if(bup.fell()){
-    resetMode = currentMode;
+
     currentMode++;
     if( ! bdo.read()){
-      bat.stopAll();
-      bat.scheduleAbsVoltage(3);
+      toggleAbsBat();
     }else{
       bat.minSchedule(4);
-//      bat.scheduleAbsolute(bat.mVoltMax/10, 2);
     }
   }
   if(bdo.fell()){
-    resetMode = currentMode;
+
     currentMode--;
     if( ! bup.read()){
-      bat.stopAll();
-      bat.scheduleAbsVoltage(3);
+      toggleAbsBat();
     }else{
       bat.minSchedule(4);
-//      bat.scheduleAbsolute(bat.mVoltMin/10, 2);
     }
   }
  
   if(currentMode<0) currentMode=0;
   if(currentMode >= MODES) currentMode=MODES-1;
 
-//  bstatfl.update();
-//  bstatup.update();
-//  bstatdo.update();
-//  if( ( ! bstatup.read()) ||
-//      ( ! bstatdo.read())
-//  ){
-//    currentMode = resetMode;
-//  }
-//  if( ( ! bstatup.read()) &&
-//      ( ! bstatdo.read())
-//  ){
-//    bat.scheduleAbsVoltage(3);
-//  }
 
   bat.onLoop();
 
-  int bestMode = bat.lowestBlinks(); // minimum 1, should always allow mode 1 because mode 0 is effectively off in terms of regulations
+  int bestMode = bat.currentBlinks(); // minimum 1, should always allow mode 1 because mode 0 is effectively off in terms of regulations
   if(bestMode>2 || bestMode>currentMode){
     // only use and store currentMode if allowed by bat
     bestMode=currentMode;
     if(currentMode!=lastMode){
-      if(currentMode>0){ // never store moonlight mode
-        EEPROM.write(MODE_ADDR, currentMode);
-      }
+      #ifdef EEPROM_h
+        if(currentMode>0){ // never store moonlight mode
+          EEPROM.write(MODE_ADDR, currentMode);
+        }
+      #endif
     }
   }
 
   int pwm = modes[bestMode];
+#ifdef PIN_FLASH  
   if( ! bfl.read()){
     pwm = 255;
     bat.minSchedule(4);
   }
-
+#endif
   if(pwm!=lastPwm){
     lastPwm = pwm;
     analogWrite(PIN_PWM ,pwm);

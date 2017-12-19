@@ -316,7 +316,7 @@ private:
     for(int i=0;i<BAT_HIST_SIZE;i++) acc+=hist[i];
 
     unsigned long avg = (acc/BAT_HIST_SIZE);
-    unsigned long xraw = avg * (unsigned long)9888;
+    unsigned long xraw = avg * (unsigned long)10540;
     unsigned int ret = (unsigned int)(xraw/1000);
 #ifdef PIN_DEBUG    
     debug.print("avg:");debug.print(avg);debug.print(" ret:");debug.println(ret);

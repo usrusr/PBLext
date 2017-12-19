@@ -65,9 +65,10 @@ Bat bat;
 int currentMode = 0;
 
 int lastPwm = -1;
+int lastBlinks = -10;
+#define LOW_BLINKS 3
 
 int absBatActive = 0;
-
 
 #ifdef PIN_FLASH
 Bounce bfl;
@@ -182,10 +183,16 @@ void loop() {
 
   bat.onLoop();
 
-  int bestMode = bat.currentBlinks(); // minimum 1, should always allow mode 1 because mode 0 is effectively off in terms of regulations
-  if(bestMode>2 || bestMode>currentMode){
-    // only use and store currentMode if allowed by bat
-    bestMode=currentMode;
+  int curBlinks = bat.currentBlinks();
+  if(curBlinks > lastBlinks) {
+    if( ! (curBlinks > lastBlinks + 1)) curBlinks = lastBlinks;
+  }
+  lastBlinks = curBlinks;
+
+  if(curBlinks <= LOW_BLINKS && currentMode > curBlinks) currentMode = curBlinks;
+
+  if(currentMode > LOW_BLINKS || currentMode != curBlinks){
+    // only use and store currentMode if not mandated by by bat
     if(currentMode!=lastMode){
       #ifdef EEPROM_h
         if(currentMode>0){ // never store moonlight mode
@@ -195,7 +202,7 @@ void loop() {
     }
   }
 
-  int pwm = modes[bestMode];
+  int pwm = modes[currentMode];
 #ifdef PIN_FLASH  
   if( ! bfl.read()){
     pwm = 255;

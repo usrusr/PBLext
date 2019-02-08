@@ -9,7 +9,7 @@
 #define BOUNCE_LOCK_OUT
 #include <Bounce2.h>
 
-
+// #define SUPPORT_ABS_BAT 1
 #define IGNORE_AFTER_RELEASE -10
 #define IGNORE_AFTER_PRESS 10
 #define MODES 6
@@ -123,10 +123,12 @@ void setup() {
 //    bat.minSchedule(5);
 //  }
   #ifdef EEPROM_h
+   #ifdef SUPPORT_ABS_BAT
   if(EEPROM.read(ABS_BATT_ADDR)){
     bat.scheduleAbsVoltage();
     absBatActive=1;
   }
+   #endif
   #endif
 #ifdef PIN_DEBUG
   debug.begin(9600); //After MyDbgSerial.begin(), the serial port is in rxMode by default
@@ -161,20 +163,28 @@ void loop() {
   if(bup.fell()){
 
     currentMode++;
+#ifdef SUPPORT_ABS_BAT
     if( ! bdo.read()){
       toggleAbsBat();
     }else{
+#endif      
       bat.minSchedule(4);
+#ifdef SUPPORT_ABS_BAT      
     }
+#endif      
   }
   if(bdo.fell()){
 
     currentMode--;
+#ifdef SUPPORT_ABS_BAT    
     if( ! bup.read()){
       toggleAbsBat();
     }else{
+#endif      
       bat.minSchedule(4);
+#ifdef SUPPORT_ABS_BAT
     }
+#endif      
   }
  
   if(currentMode<0) currentMode=0;
